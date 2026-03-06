@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ginevra Shooter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --fg: #e8e8e8;
+            --accent: #ff3d00;
+            --accent-glow: #ff6b35;
+            --secondary: #00e5ff;
+            --card: rgba(20, 20, 30, 0.8);
+            --border: rgba(255, 61, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            overflow: hidden;
+            cursor: none;
+        }
+
+        /* STILI PER LA NUOVA INTRO */
+        .intro-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .intro-screen.hidden {
+            display: none;
+        }
+
+        .intro-bg-image {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transform: scale(1.1);
+            animation: intro-img-in 1s ease-out 0.2s forwards;
+            filter: brightness(0.6);
+        }
+
+        @keyframes intro-img-in {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .intro-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%, rgba(0,0,0,0.4) 100%);
+        }
+
+        .intro-text {
+            position: relative;
+            z-index: 10;
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: intro-text-in 1s ease-out 1s forwards;
+            text-shadow: 0 0 20px var(--accent);
+        }
+
+        @keyframes intro-text-in {
+            to { opacity: 1; }
+        }
+
+        .intro-screen.fade-out {
+            animation: intro-fade-out 0.8s ease-in forwards;
+        }
+
+        @keyframes intro-fade-out {
+            to { opacity: 0; pointer-events: none; }
+        }
+
+        /* FINE STILI INTRO */
+
+        .game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(255, 61, 0, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(0, 229, 255, 0.1) 0%, transparent 50%),
+                linear-gradient(180deg, #0a0a0f 0%, #151520 100%);
+        }
+
+        .crosshair {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            pointer-events: none;
+            z-index: 1000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s ease-out;
+        }
+
+        .crosshair-inner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-glow), 0 0 20px var(--accent);
+        }
+
+        .crosshair-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+
+        .crosshair-line {
+            position: absolute;
+            background: var(--accent);
+        }
+
+        .crosshair-line.top { top: 0; left: 50%; transform: translateX(-50%); width: 2px; height: 15px; }
+        .crosshair-line.bottom { bottom: 0; left: 50%; transform: translateX(-50%); width: 2px; height: 15px; }
+        .crosshair-line.left { left: 0; top: 50%; transform: translateY(-50%); width: 15px; height: 2px; }
+        .crosshair-line.right { right: 0; top: 50%; transform: translateY(-50%); width: 15px; height: 2px; }
+
+        .crosshair.firing .crosshair-ring {
+            animation: fire-pulse 0.15s ease-out;
+        }
+
+        @keyframes fire-pulse {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+        }
+
+        .hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+        }
+
+        .score-panel, .ammo-panel, .combo-panel {
+            background: var(--card);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 24px;
+        }
+
+        .score-label, .ammo-label, .combo-label {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--secondary);
+            text-transform: uppercase;
+        }
+
+        .score-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--fg);
+            text-shadow: 0 0 20px var(--accent);
+        }
+
+        .ammo-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--fg);
+        }
+
+        .combo-value {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-glow);
+        }
+
+        .enemy {
+            position: absolute;
+            border-radius: 50%;
+            cursor: none;
+            transition: transform 0.1s ease-out;
+            box-shadow: 0 0 30px rgba(255, 61, 0, 0.5);
+        }
+
+        .enemy img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 3px solid var(--accent);
+        }
+
+        .enemy.hit {
+            animation: enemy-hit 0.3s ease-out forwards;
+        }
+
+        @keyframes enemy-hit {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.5; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .hit-effect {
+            position: fixed;
+            pointer-events: none;
+            z-index: 500;
+        }
+
+        .hit-particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: particle-fly 0.6s ease-out forwards;
+        }
+
+        @keyframes particle-fly {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        .score-popup {
+            position: fixed;
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--secondary);
+            text-shadow: 0 0 10px var(--secondary);
+            pointer-events: none;
+            z-index: 600;
+            animation: score-rise 0.8s ease-out forwards;
+        }
+
+        @keyframes score-rise {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-60px) scale(1.2); opacity: 0; }
+        }
+
+        .game-over-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(20px);
+        }
+
+        .game-over-screen.active {
+            display: flex;
+            animation: fade-in 0.5s ease-out;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .game-over-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 64px;
+            font-weight: 900;
+            color: var(--accent);
+            text-shadow: 0 0 40px var(--accent);
+            margin-bottom: 20px;
+            animation: glitch 0.3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            25% { transform: translate(-2px, 1px); }
+            50% { transform: translate(2px, -1px); }
+            75% { transform: translate(-1px, 2px); }
+            100% { transform: translate(0); }
+        }
+
+        .final-score {
+            font-family: 'Orbitron', monospace;
+            font-size: 48px;
+            color: var(--fg);
+            margin-bottom: 40px;
+        }
+
+        .restart-btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 16px 48px;
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .restart-btn:hover {
+            background: var(--accent);
+            color: var(--bg);
+            box-shadow: 0 0 30px var(--accent);
+        }
+
+        .start-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            backdrop-filter: blur(30px);
+        }
+
+        .start-screen.hidden {
+            display: none;
+        }
+
+        .game-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 72px;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            animation: title-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes title-pulse {
+            0%, 100% { filter: drop-shadow(0 0 20px var(--accent)); }
+            50% { filter: drop-shadow(0 0 40px var(--accent-glow)); }
+        }
+
+        .game-subtitle {
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 60px;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            padding: 20px 60px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-glow) 100%);
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .start-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shine 2s infinite;
+        }
+
+        @keyframes shine {
+            0% { left: -100%; }
+            50%, 100% { left: 100%; }
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 50px var(--accent);
+        }
+
+        .instructions {
+            margin-top: 40px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+        }
+
+        .instructions span {
+            color: var(--secondary);
+        }
+
+        .grid-bg {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 61, 0, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 61, 0, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .miss-effect {
+            position: fixed;
+            width: 100px;
+            height: 100px;
+            border: 2px solid rgba(255, 61, 0, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 400;
+            animation: miss-ring 0.4s ease-out forwards;
+        }
+
+        @keyframes miss-ring {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+        }
+
+        .timer-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 6px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-glow));
+            box-shadow: 0 0 20px var(--accent);
+            z-index: 100;
+            transition: width 0.1s linear;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .game-title { font-size: 36px; }
+            .game-over-title { font-size: 36px; }
+            .hud { padding: 10px 15px; flex-wrap: wrap; gap: 10px; }
+            .score-panel, .ammo-panel, .combo-panel { padding: 8px 16px; }
+            .score-value { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NUOVA SCHERMATA INTRO -->
+    <div class="intro-screen" id="introScreen">
+        <!-- Immagine di sfondo dell'intro (usa gin1.jpeg) -->
+        <img src="gin6.jpeg" class="intro-bg-image" alt="Intro">
+        <div class="intro-overlay"></div>
+        <div class="intro-text">Preparati...</div>
+    </div>
+
+    <div class="start-screen" id="startScreen">
+        <h1 class="game-title">GINEVRA SHOOTER</h1>
+        <p class="game-subtitle">Colpisci Ginevra</p>
+        <button class="start-btn" onclick="startGame()">GIOCA</button>
+        <div class="instructions">
+            <p><span>Clicca</span> per sparare Ginevra</p>
+            <p>Combo consecutive = piu punti</p>
+            <p>Non mancare Ginevra!</p>
+        </div>
+    </div>
+
+    <div class="game-over-screen" id="gameOverScreen">
+        <h1 class="game-over-title">GAME OVER</h1>
+        <p class="final-score">Punteggio: <span id="finalScore">0</span></p>
+        <button class="restart-btn" onclick="restartGame()">RIGIOCA</button>
+    </div>
+
+    <div class="game-container" id="gameContainer">
+        <div class="grid-bg"></div>
+        
+        <div class="timer-bar" id="timerBar"></div>
+        
+        <div class="hud">
+            <div class="score-panel">
+                <div class="score-label">Punteggio</div>
+                <div class="score-value" id="scoreDisplay">0</div>
+            </div>
+            <div class="combo-panel">
+                <div class="combo-label">Combo</div>
+                <div class="combo-value" id="comboDisplay">x1</div>
+            </div>
+            <div class="ammo-panel">
+                <div class="ammo-label">Tempo</div>
+                <div class="ammo-value" id="timeDisplay">60</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="crosshair" id="crosshair">
+        <div class="crosshair-inner"></div>
+        <div class="crosshair-ring"></div>
+        <div class="crosshair-line top"></div>
+        <div class="crosshair-line bottom"></div>
+        <div class="crosshair-line left"></div>
+        <div class="crosshair-line right"></div>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------
+        // CONFIGURAZIONE IMMAGINI
+        // Aggiungi qui i link delle tue foto (diretti .jpg, .png, ecc)
+        // ---------------------------------------------------------
+        const imageUrls = [
+            // Le tue foto originali
+            'gin1.jpeg',
+            'gin2.jpeg',
+            'gin3.jpeg',
+            'gin4.jpeg',
+            'gin5.jpeg',
+            'gin6.jpeg',
+            'gin8.jpeg',
+            
+            
+            // AGGIUNGI QUI LE NUOVE FOTO (ricorda la virgola tra un link e l'altro):
+            // 'LINK_FOTO_3_QUI',
+            // 'LINK_FOTO_4_QUI',
+        ];
+
+        // Stato del gioco
+        let gameState = {
+            score: 0,
+            combo: 1,
+            timeLeft: 60,
+            isPlaying: false,
+            enemies: [],
+            mouseX: 0,
+            mouseY: 0,
+            lastHitTime: 0
+        };
+
+        // Elementi DOM
+        const gameContainer = document.getElementById('gameContainer');
+        const crosshair = document.getElementById('crosshair');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const comboDisplay = document.getElementById('comboDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const timerBar = document.getElementById('timerBar');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScore = document.getElementById('finalScore');
+        const introScreen = document.getElementById('introScreen');
+
+        let gameLoop = null;
+        let timerInterval = null;
+        let spawnInterval = null;
+
+        // Logica per l'Intro
+        window.onload = function() {
+            // Dopo 2.5 secondi, nascondi l'intro con una dissolvenza
+            setTimeout(() => {
+                introScreen.classList.add('fade-out');
+                // Rimuovi completamente l'elemento dal DOM dopo l'animazione
+                setTimeout(() => {
+                    introScreen.classList.add('hidden');
+                }, 800);
+            }, 2500);
+        };
+
+        // Movimento mirino
+        document.addEventListener('mousemove', (e) => {
+            gameState.mouseX = e.clientX;
+            gameState.mouseY = e.clientY;
+            crosshair.style.left = e.clientX + 'px';
+            crosshair.style.top = e.clientY + 'px';
+        });
+
+        // Click per sparare
+        gameContainer.addEventListener('click', (e) => {
+            if (!gameState.isPlaying) return;
+            
+            crosshair.classList.add('firing');
+            setTimeout(() => crosshair.classList.remove('firing'), 150);
+            
+            let hit = false;
+            const clickX = e.clientX;
+            const clickY = e.clientY;
+            
+            gameState.enemies.forEach((enemy, index) => {
+                if (hit) return;
+                
+                const rect = enemy.element.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const distance = Math.sqrt(Math.pow(clickX - centerX, 2) + Math.pow(clickY - centerY, 2));
+                
+                if (distance < rect.width / 2 + 20) {
+                    hit = true;
+                    hitEnemy(enemy, index, centerX, centerY);
+                }
+            });
+            
+            if (!hit) {
+                // Mancato il bersaglio
+                gameState.combo = 1;
+                updateCombo();
+                createMissEffect(clickX, clickY);
+            }
+        });
+
+        function hitEnemy(enemy, index, x, y) {
+            // Aumenta combo
+            const now = Date.now();
+            if (now - gameState.lastHitTime < 1500) {
+                gameState.combo = Math.min(gameState.combo + 1, 10);
+            } else {
+                gameState.combo = 1;
+            }
+            gameState.lastHitTime = now;
+            updateCombo();
+            
+            // Calcola punti
+            const basePoints = 100;
+            const points = basePoints * gameState.combo;
+            gameState.score += points;
+            updateScore();
+            
+            // Effetti visivi
+            createHitParticles(x, y);
+            createScorePopup(x, y, points);
+            
+            // Rimuovi nemico
+            enemy.element.classList.add('hit');
+            gameState.enemies.splice(index, 1);
+            
+            setTimeout(() => {
+                if (enemy.element.parentNode) {
+                    enemy.element.remove();
+                }
+            }, 300);
+        }
+
+        function createHitParticles(x, y) {
+            const container = document.createElement('div');
+            container.className = 'hit-effect';
+            container.style.left = x + 'px';
+            container.style.top = y + 'px';
+            
+            for (let i = 0; i < 12; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'hit-particle';
+                const angle = (i / 12) * Math.PI * 2;
+                const distance = 50 + Math.random() * 50;
+                particle.style.setProperty('--tx', Math.cos(angle) * distance + 'px');
+                particle.style.setProperty('--ty', Math.sin(angle) * distance + 'px');
+                particle.style.background = Math.random() > 0.5 ? '#ff3d00' : '#00e5ff';
+                container.appendChild(particle);
+            }
+            
+            document.body.appendChild(container);
+            setTimeout(() => container.remove(), 600);
+        }
+
+        function createScorePopup(x, y, points) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = '+' + points;
+            popup.style.left = x + 'px';
+            popup.style.top = y + 'px';
+            document.body.appendChild(popup);
+            setTimeout(() => popup.remove(), 800);
+        }
+
+        function createMissEffect(x, y) {
+            const miss = document.createElement('div');
+            miss.className = 'miss-effect';
+            miss.style.left = x + 'px';
+            miss.style.top = y + 'px';
+            document.body.appendChild(miss);
+            setTimeout(() => miss.remove(), 400);
+        }
+
+        function spawnEnemy() {
+            const enemy = document.createElement('div');
+            enemy.className = 'enemy';
+            
+            const size = 80 + Math.random() * 60;
+            const padding = 100;
+            const x = padding + Math.random() * (window.innerWidth - size - padding * 2);
+            const y = padding + Math.random() * (window.innerHeight - size - padding * 2);
+            
+            enemy.style.width = size + 'px';
+            enemy.style.height = size + 'px';
+            enemy.style.left = x + 'px';
+            enemy.style.top = y + 'px';
+            
+            const img = document.createElement('img');
+            img.src = imageUrls[Math.floor(Math.random() * imageUrls.length)];
+            enemy.appendChild(img);
+            
+            gameContainer.appendChild(enemy);
+            
+            const enemyData = {
+                element: enemy,
+                spawnTime: Date.now(),
+                lifetime: 3000 + Math.random() * 2000
+            };
+            
+            gameState.enemies.push(enemyData);
+            
+            // Animazione entrata
+            enemy.style.transform = 'scale(0) rotate(-180deg)';
+            enemy.style.opacity = '0';
+            setTimeout(() => {
+                enemy.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                enemy.style.transform = 'scale(1) rotate(0deg)';
+                enemy.style.opacity = '1';
+            }, 10);
+            
+            // Auto-rimozione dopo lifetime
+            setTimeout(() => {
+                const idx = gameState.enemies.indexOf(enemyData);
+                if (idx > -1) {
+                    gameState.enemies.splice(idx, 1);
+                    enemy.style.transition = 'all 0.3s ease-out';
+                    enemy.style.transform = 'scale(0)';
+                    enemy.style.opacity = '0';
+                    setTimeout(() => enemy.remove(), 300);
+                    
+                    // Penalita per non aver colpito
+                    gameState.combo = 1;
+                    updateCombo();
+                }
+            }, enemyData.lifetime);
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = gameState.score;
+            scoreDisplay.style.transform = 'scale(1.2)';
+            setTimeout(() => scoreDisplay.style.transform = 'scale(1)', 100);
+        }
+
+        function updateCombo() {
+            comboDisplay.textContent = 'x' + gameState.combo;
+            if (gameState.combo > 1) {
+                comboDisplay.style.color = '#ff6b35';
+                comboDisplay.style.textShadow = '0 0 20px #ff6b35';
+            } else {
+                comboDisplay.style.color = '#ff6b35';
+                comboDisplay.style.textShadow = 'none';
+            }
+        }
+
+        function updateTimer() {
+            gameState.timeLeft--;
+            timeDisplay.textContent = gameState.timeLeft;
+            timerBar.style.width = (gameState.timeLeft / 60 * 100) + '%';
+            
+            if (gameState.timeLeft <= 0) {
+                endGame();
+            }
+            
+            if (gameState.timeLeft <= 10) {
+                timeDisplay.style.color = '#ff3d00';
+            }
+        }
+
+        function startGame() {
+            startScreen.classList.add('hidden');
+            gameState = {
+                score: 0,
+                combo: 1,
+                timeLeft: 60,
+                isPlaying: true,
+                enemies: [],
+                mouseX: 0,
+                mouseY: 0,
+                lastHitTime: 0
+            };
+            
+            updateScore();
+            updateCombo();
+            timeDisplay.textContent = '60';
+            timeDisplay.style.color = '#e8e8e8';
+            timerBar.style.width = '100%';
+            
+            spawnInterval = setInterval(spawnEnemy, 1200);
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Spawn iniziale
+            spawnEnemy();
+            setTimeout(spawnEnemy, 400);
+            setTimeout(spawnEnemy, 800);
+        }
+
+        function endGame() {
+            gameState.isPlaying = false;
+            clearInterval(spawnInterval);
+            clearInterval(timerInterval);
+            
+            // Rimuovi tutti i nemici
+            gameState.enemies.forEach(e => e.element.remove());
+            gameState.enemies = [];
+            
+            finalScore.textContent = gameState.score;
+            gameOverScreen.classList.add('active');
+        }
+
+        function restartGame() {
+            gameOverScreen.classList.remove('active');
+            startGame();
+        }
+
+        // Effetto background dinamico
+        let bgOffset = 0;
+        function animateBackground() {
+            bgOffset += 0.5;
+            document.querySelector('.grid-bg').style.backgroundPosition = bgOffset + 'px ' + bgOffset + 'px';
+            requestAnimationFrame(animateBackground);
+        }
+        animateBackground();
+    </script>
+</body>
+</html>
